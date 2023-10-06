@@ -70,3 +70,66 @@ class MultiHeadAttention(nn.Module):
                     dim = -1
                 )
             )
+        
+class Residual(nn.Module):
+    def __init(self, sublayer: nn.Module, dimension: int, dropout: float = 0.1):
+        super().__init__()
+        self.sublayer = sublayer
+        self.norm = nn.LayerNorm(dimension)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, *tensors: Tensor) -> Tensor:
+        # Assumes query tensor is given first so risdual can be computed.
+        return self.norm(tensors[0] + self.dropout(self.sublayer(*tensors)))
+    
+class EncoderLayer(nn.Module):
+    def __init__(
+            self,
+            dim_model: int = 512,
+            num_heads: int = 6,
+            dim_feedforward: int = 2048,
+            dropout: float = 0.1
+    ):
+        
+        super().__init__()
+
+        dim_q = dim_k = max(dim_model // num_heads, 1)
+
+        self.attention = Residual(
+            MultiHeadAttention(num_heads, dim_model, dim_q, dim_k),
+            dimension=dim_model,
+            dropout=dropout
+        )
+
+        self.feed_forward = Residual(
+            feed_forward(dim_model, dim_feedforward),
+            dimension=dim_model,
+            droput=dropout
+        )
+
+    def forward(self, src: Tensor) -> Tensor:
+        src = self.attention(src, src, src)
+        return self.feed_forward(src)
+
+class Encoder(nn.Module):
+    def __inti__(
+        self,
+        num_layers: int = 6,
+        dim_model: int = 512,
+        num_heads: int = 8,
+        dim_feedforward: int = 2048,
+        dropout: float = 0.1
+    ):
+        super().__init()
+        self.layers == nn.ModuleList(
+            [
+                EncoderLayer(dim_model, num_heads, dim_feedforward, dropout)
+                for x in range(num_layers)
+            ]
+        )
+    
+    def forward(self, src: Tensor) -> Tensor:
+        seq_len, dimension = src.size(1), src.size(2)
+        src += PositionEncoding(seq_len, dimension)
+        for layer in self.layers:
+            src = layer(src)
